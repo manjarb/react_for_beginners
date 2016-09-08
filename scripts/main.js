@@ -1,5 +1,6 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
+var CSSTransitionGroup = require('react-addons-css-transition-group');
 
 var ReactRouter = require('react-router');
 var Router = ReactRouter.Router;
@@ -48,7 +49,11 @@ var App = React.createClass({
     },
     addToOrder : function (key) {
         this.state.order[key] = this.state.order[key] + 1 || 1;
-        this.setState({ order : this.state.order })
+        this.setState({ order : this.state.order });
+    },
+    removeFromOrder : function (key) {
+        delete this.state.order[key];
+        this.setState({ order : this.state.order });
     },
     addFish: function (fish) {
         var timestamp = (new Date()).getTime();
@@ -59,6 +64,12 @@ var App = React.createClass({
         this.setState({ fishes : this.state.fishes });
 
     },
+    removeFish : function (key) {
+        if(confirm("Are you sure remove")) {
+            this.state.fishes[key] = null;
+            this.setState({fishes: this.state.fishes});
+        }
+    },
     loadSamples : function () {
       this.setState({
           fishes: require('./sample-fishes')
@@ -67,9 +78,10 @@ var App = React.createClass({
     renderFish : function (key) {
         return <Fish key={key} index={key} details={this.state.fishes[key]} addToOrder={this.addToOrder}/>
     },
-    updateFishNameWithInput : function (key,value) {
+    updateFishDataWithInput : function (key,value,input_part) {
         // update the state object
-        this.state.fishes[key].name = value;
+
+        this.state.fishes[key][input_part] = value;
         this.setState({ fishes : this.state.fishes })
     },
     render : function () {
@@ -82,9 +94,14 @@ var App = React.createClass({
                         {Object.keys(this.state.fishes).map(key => this.renderFish(key))}
                     </ul>
                 </div>
-                <Order fishes={this.state.fishes} order={this.state.order}/>
-                <Inventory addFish={this.addFish} loadSamples={this.loadSamples}
-                    fishes={this.state.fishes} linkState={this.linkState} updateFishNameWithInput={this.updateFishNameWithInput}/>
+                <Order fishes={this.state.fishes}
+                       order={this.state.order}
+                       removeFromOrder={this.removeFromOrder}/>
+                <Inventory addFish={this.addFish}
+                           loadSamples={this.loadSamples}
+                           fishes={this.state.fishes} linkState={this.linkState}
+                           updateFishDataWithInput={this.updateFishDataWithInput}
+                           removeFish={this.removeFish}/>
             </div>
         )
     }
@@ -174,6 +191,9 @@ var Header = React.createClass({
                 <h3 className="tagline"><span>{ this.props.tagline }</span></h3>
             </header>
         )
+    },
+    propTypes : {
+        tagline: React.PropTypes.string.isRequired
     }
 });
 
@@ -183,9 +203,10 @@ var Order = React.createClass({
     renderOrder : function (key) {
         var fish = this.props.fishes[key];
         var count = this.props.order[key];
+        var removeButton = <button onClick={this.props.removeFromOrder.bind(null,key)}>&times;</button>
 
         if(!fish) {
-            return <li key={key}>Sorry, fish no longer available!</li>
+            return <li key={key}>Sorry, fish no longer available! {removeButton}</li>
         }
 
         return (
@@ -193,6 +214,7 @@ var Order = React.createClass({
                 <span>{count}lbs</span>
                 <span>{fish.name}</span>
                 <span className="price">{h.formatPrice(count * fish.price)}</span>
+                {removeButton}
             </li>
         )
     },
@@ -213,7 +235,12 @@ var Order = React.createClass({
         return (
             <div className="order-wrap">
                 <h2 className="order-title">Your Order</h2>
-                <ul className="order">
+                <CSSTransitionGroup
+                    className="order"
+                    component="ul"
+                    transitionName="order"
+                    transitionEnterTimeout={500}
+                    transitionLeaveTimeout={500}>
                     {
                         orderIds.map(this.renderOrder)
                     }
@@ -223,7 +250,7 @@ var Order = React.createClass({
                         </strong>
                         {h.formatPrice(total)}
                     </li>
-                </ul>
+                </CSSTransitionGroup>
             </div>
         )
     }
@@ -240,8 +267,26 @@ var Inventory = React.createClass({
               {/*<input type="text" valueLink={linkState('fishes.'+ key + '.name')}/>*/}
               <input type="text"
                      value={this.props.fishes[key].name}
-                     onChange={ e => this.props.updateFishNameWithInput(key,e.target.value)}/>
-          </div>
+                     onChange={ e => this.props.updateFishDataWithInput(key,e.target.value,"name")}/>
+              <input type="text"
+                     value={this.props.fishes[key].price}
+                     onChange={ e => this.props.updateFishDataWithInput(key,e.target.value,"price")}/>
+              <select
+                  onChange={e => this.props.updateFishDataWithInput(key,e.target.value,"status")}
+                  value={this.props.fishes[key].status}>
+                  <option value="unavailable">Sold Out!</option>
+                  <option value="available">Fresh!</option>
+              </select>
+              <textarea
+                  onChange={e => this.props.updateFishDataWithInput(key,e.target.value,"desc")}
+                  value={this.props.fishes[key].desc}>
+              </textarea>
+              <input type="text"
+                     value={this.props.fishes[key].image}
+                     onChange={ e => this.props.updateFishDataWithInput(key,e.target.value,"image")}/>
+
+              <button onClick={this.props.removeFish.bind(null,key)}>Remove Fish</button>
+        </div>
         )
     },
     render : function () {
@@ -254,6 +299,13 @@ var Inventory = React.createClass({
                 <button onClick={this.props.loadSamples}>Load Sample fishes</button>
             </div>
         )
+    },
+    propTypes : {
+        addFish : React.PropTypes.func.isRequired,
+        loadSamples : React.PropTypes.func.isRequired,
+        fishes : React.PropTypes.object.isRequired,
+        updateFishDataWithInput : React.PropTypes.func.isRequired,
+        removeFish : React.PropTypes.func.isRequired
     }
 });
 
